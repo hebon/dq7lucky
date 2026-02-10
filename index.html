@@ -72,6 +72,11 @@
       max-width: 100%;
     }
 
+    .grid.size-4x3 {
+      grid-template-columns: repeat(4, minmax(65px, 80px));
+      grid-template-rows: repeat(3, minmax(65px, 80px));
+    }
+
     .grid.size-4x4 {
       grid-template-columns: repeat(4, minmax(60px, 80px));
       grid-template-rows: repeat(4, minmax(60px, 80px));
@@ -112,6 +117,11 @@
 
     /* スマホ対応 */
     @media (max-width: 480px) {
+      .grid.size-4x3 {
+        grid-template-columns: repeat(4, calc((100vw - 40px) / 4));
+        grid-template-rows: repeat(3, calc((100vw - 40px) / 4));
+      }
+
       .grid.size-4x4 {
         grid-template-columns: repeat(4, calc((100vw - 40px) / 4));
         grid-template-rows: repeat(4, calc((100vw - 40px) / 4));
@@ -152,11 +162,13 @@
   <h1>ラッキーパネル</h1>
 
   <div id="sizeSelection" class="controls">
+    <button onclick="startGame(12)">4x3で開始</button>
     <button onclick="startGame(16)">4x4で開始</button>
     <button onclick="startGame(20)">5x4で開始</button>
   </div>
 
   <div id="gameControls" class="controls hidden">
+    <button id="undoButton" onclick="undoLastColor()" disabled>取り消し</button>
     <button onclick="resetGame()">リセット</button>
   </div>
 
@@ -188,6 +200,7 @@
     let currentColorIndex = 0;
     let coloringStep = 0; // 0 or 1 (1つ目のパネルか2つ目のパネルか)
     let selectedCell = null;
+    let lastColoredCell = null; // 最後に色付けしたパネルのインデックス
 
     function startGame(size) {
       gridSize = size;
@@ -201,7 +214,13 @@
       document.getElementById('gameControls').classList.remove('hidden');
 
       const grid = document.getElementById('grid');
-      grid.className = size === 16 ? 'grid size-4x4' : 'grid size-5x4';
+      if (size === 12) {
+        grid.className = 'grid size-4x3';
+      } else if (size === 16) {
+        grid.className = 'grid size-4x4';
+      } else {
+        grid.className = 'grid size-5x4';
+      }
       grid.innerHTML = '';
 
       for (let i = 0; i < size; i++) {
@@ -230,7 +249,15 @@
     }
 
     function handleColoringMode(index) {
-      const pairCount = gridSize === 16 ? 7 : 9;
+      // グリッドサイズに応じてペア数を決定
+      let pairCount;
+      if (gridSize === 12) {
+        pairCount = 5; // 4x3: 5ペア
+      } else if (gridSize === 16) {
+        pairCount = 7; // 4x4: 7ペア
+      } else {
+        pairCount = 9; // 5x4: 9ペア
+      }
       const totalPairs = pairCount * 2;
 
       let color;
@@ -250,6 +277,9 @@
       cells[index].color = color;
       updateCellDisplay(document.querySelector(`[data-index="${index}"]`), index);
 
+      // 最後に色付けしたセルを記録
+      lastColoredCell = index;
+
       coloringStep++;
       if (coloringStep === 2) {
         // 2パネル目を塗り終えた
@@ -260,6 +290,11 @@
       // 全パネルに色がついたかチェック
       if (cells.every(c => c.color !== INITIAL_COLOR)) {
         mode = 'shuffle';
+        // シャッフルモードになったら取り消しボタンを無効化
+        document.getElementById('undoButton').disabled = true;
+      } else {
+        // 取り消しボタンを有効化
+        document.getElementById('undoButton').disabled = false;
       }
 
       updateStatus();
@@ -323,18 +358,26 @@
       if (mode === 'idle') {
         status.textContent = '';
       } else if (mode === 'coloring') {
-        const pairCount = gridSize === 16 ? 7 : 9;
+        // グリッドサイズに応じてペア数を決定
+        let pairCount;
+        if (gridSize === 12) {
+          pairCount = 5; // 4x3: 5ペア
+        } else if (gridSize === 16) {
+          pairCount = 7; // 4x4: 7ペア
+        } else {
+          pairCount = 9; // 5x4: 9ペア
+        }
         const coloredCount = cells.filter(c => c.color !== INITIAL_COLOR).length;
         const totalPairs = pairCount * 2;
 
         if (coloredCount < totalPairs) {
           const currentPair = Math.floor(coloredCount / 2) + 1;
           const step = coloringStep + 1;
-          status.textContent = `色付けモード: ペア${currentPair} - ${step}つ目のパネルを選択`;
+          status.textContent = `配置モード: ペア${currentPair} - ${step}つ目のパネルを選択`;
         } else if (coloredCount === totalPairs) {
-          status.textContent = '色付けモード: チャンスパネルを選択';
+          status.textContent = '配置モード: チャンスパネルを選択';
         } else {
-          status.textContent = '色付けモード: シャッフルパネルを選択';
+          status.textContent = '配置モード: シャッフルパネルを選択';
         }
       } else if (mode === 'shuffle') {
         if (selectedCell === null) {
@@ -345,6 +388,33 @@
       }
     }
 
+    function undoLastColor() {
+      // 配置モードでない、または最後に色付けしたセルがない場合は何もしない
+      if (mode !== 'coloring' || lastColoredCell === null) {
+        return;
+      }
+
+      // 最後に色付けしたパネルの色を白に戻す
+      cells[lastColoredCell].color = INITIAL_COLOR;
+      updateCellDisplay(document.querySelector(`[data-index="${lastColoredCell}"]`), lastColoredCell);
+
+      // coloringStepとcurrentColorIndexを調整
+      if (coloringStep === 0) {
+        // 2つ目を塗った直後なら、1つ目に戻す
+        coloringStep = 1;
+        currentColorIndex--;
+      } else {
+        // 1つ目を塗った直後なら、前のペアの2つ目に戻す
+        coloringStep = 0;
+      }
+
+      // 取り消しボタンを無効化（連続取り消しを防ぐ）
+      document.getElementById('undoButton').disabled = true;
+      lastColoredCell = null;
+
+      updateStatus();
+    }
+
     function resetGame() {
       gridSize = 0;
       cells = [];
@@ -352,10 +422,12 @@
       currentColorIndex = 0;
       coloringStep = 0;
       selectedCell = null;
+      lastColoredCell = null;
 
       document.getElementById('sizeSelection').classList.remove('hidden');
       document.getElementById('gameControls').classList.add('hidden');
       document.getElementById('grid').innerHTML = '';
+      document.getElementById('undoButton').disabled = true;
 
       updateStatus();
     }
