@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ラッキーパネル</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: 2px solid #333;
+      background-color: white;
+      border-radius: 5px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #e0e0e0;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #555;
+    }
+
+    .grid {
+      display: grid;
+      gap: 5px;
+      background-color: #ddd;
+      padding: 5px;
+      border-radius: 5px;
+    }
+
+    .grid.size-4x4 {
+      grid-template-columns: repeat(4, 80px);
+      grid-template-rows: repeat(4, 80px);
+    }
+
+    .grid.size-5x4 {
+      grid-template-columns: repeat(5, 80px);
+      grid-template-rows: repeat(4, 80px);
+    }
+
+    .cell {
+      background-color: white;
+      border: 2px solid #999;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.3);
+    }
+
+    .cell:hover {
+      border-color: #333;
+      transform: scale(1.05);
+    }
+
+    .cell.selected {
+      border-color: #000;
+      border-width: 3px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>ラッキーパネル</h1>
+
+  <div id="sizeSelection" class="controls">
+    <button onclick="startGame(16)">4x4で開始</button>
+    <button onclick="startGame(20)">5x4で開始</button>
+  </div>
+
+  <div id="gameControls" class="controls hidden">
+    <button onclick="resetGame()">リセット</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div id="grid" class="grid"></div>
+
+  <script>
+    // 9色のパステルカラー
+    const PAIR_COLORS = [
+      '#FFB3BA', // パステルレッド
+      '#87CEEB', // パステルブルー（濃いめ）
+      '#BAFFC9', // パステルグリーン
+      '#FFD6E8', // パステルピンク
+      '#B19CD9', // パステルパープル（濃いめ）
+      '#FFDFBA', // パステルオレンジ
+      '#7FDBDB', // パステルシアン（暗めで緑寄り）
+      '#E8FFBA', // パステルライム
+      '#DDA0DD', // パステルラベンダー（プラム系）
+    ];
+
+    const LUCKY_COLOR = '#FFD700'; // 濃い黄色（ゴールド）
+    const MISS_COLOR = '#A0A0A0';  // グレー
+    const INITIAL_COLOR = '#FFFFFF'; // 白
+
+    let gridSize = 0;
+    let cells = [];
+    let mode = 'idle'; // idle, coloring, shuffle
+    let currentColorIndex = 0;
+    let coloringStep = 0; // 0 or 1 (1つ目のパネルか2つ目のパネルか)
+    let selectedCell = null;
+
+    function startGame(size) {
+      gridSize = size;
+      cells = Array(size).fill(null).map(() => ({ color: INITIAL_COLOR }));
+      mode = 'coloring';
+      currentColorIndex = 0;
+      coloringStep = 0;
+      selectedCell = null;
+
+      document.getElementById('sizeSelection').classList.add('hidden');
+      document.getElementById('gameControls').classList.remove('hidden');
+
+      const grid = document.getElementById('grid');
+      grid.className = size === 16 ? 'grid size-4x4' : 'grid size-5x4';
+      grid.innerHTML = '';
+
+      for (let i = 0; i < size; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.index = i;
+        cell.onclick = () => handleCellClick(i);
+        updateCellDisplay(cell, i);
+        grid.appendChild(cell);
+      }
+
+      updateStatus();
+    }
+
+    function handleCellClick(index) {
+      if (cells[index].color !== INITIAL_COLOR && mode === 'coloring') {
+        // すでに色がついている場合は何もしない
+        return;
+      }
+
+      if (mode === 'coloring') {
+        handleColoringMode(index);
+      } else if (mode === 'shuffle') {
+        handleShuffleMode(index);
+      }
+    }
+
+    function handleColoringMode(index) {
+      const pairCount = gridSize === 16 ? 7 : 9;
+      const totalPairs = pairCount * 2;
+
+      let color;
+      const coloredCount = cells.filter(c => c.color !== INITIAL_COLOR).length;
+
+      if (coloredCount < totalPairs) {
+        // ペア色を割り当て
+        color = PAIR_COLORS[currentColorIndex];
+      } else if (coloredCount === totalPairs) {
+        // チャンスパネル
+        color = LUCKY_COLOR;
+      } else {
+        // シャッフルパネル
+        color = MISS_COLOR;
+      }
+
+      cells[index].color = color;
+      updateCellDisplay(document.querySelector(`[data-index="${index}"]`), index);
+
+      coloringStep++;
+      if (coloringStep === 2) {
+        // 2パネル目を塗り終えた
+        coloringStep = 0;
+        currentColorIndex++;
+      }
+
+      // 全パネルに色がついたかチェック
+      if (cells.every(c => c.color !== INITIAL_COLOR)) {
+        mode = 'shuffle';
+      }
+
+      updateStatus();
+    }
+
+    function handleShuffleMode(index) {
+      if (selectedCell === null) {
+        // 1つ目のパネルを選択
+        selectedCell = index;
+        document.querySelector(`[data-index="${index}"]`).classList.add('selected');
+      } else {
+        // 2つ目のパネルを選択して色を交換
+        const cell1 = selectedCell;
+        const cell2 = index;
+
+        // 色を交換
+        const tempColor = cells[cell1].color;
+        cells[cell1].color = cells[cell2].color;
+        cells[cell2].color = tempColor;
+
+        // 表示を更新
+        updateCellDisplay(document.querySelector(`[data-index="${cell1}"]`), cell1);
+        updateCellDisplay(document.querySelector(`[data-index="${cell2}"]`), cell2);
+
+        // 選択状態をクリア
+        document.querySelector(`[data-index="${cell1}"]`).classList.remove('selected');
+        selectedCell = null;
+      }
+    }
+
+    function updateCellDisplay(cellElement, index) {
+      cellElement.style.backgroundColor = cells[index].color;
+
+      // 番号表示（デバッグ用・必要に応じて削除可能）
+      cellElement.textContent = index + 1;
+    }
+
+    function updateStatus() {
+      const status = document.getElementById('status');
+
+      if (mode === 'idle') {
+        status.textContent = '';
+      } else if (mode === 'coloring') {
+        const pairCount = gridSize === 16 ? 7 : 9;
+        const coloredCount = cells.filter(c => c.color !== INITIAL_COLOR).length;
+        const totalPairs = pairCount * 2;
+
+        if (coloredCount < totalPairs) {
+          const currentPair = Math.floor(coloredCount / 2) + 1;
+          const step = coloringStep + 1;
+          status.textContent = `色付けモード: ペア${currentPair} - ${step}つ目のパネルを選択`;
+        } else if (coloredCount === totalPairs) {
+          status.textContent = '色付けモード: チャンスパネルを選択';
+        } else {
+          status.textContent = '色付けモード: シャッフルパネルを選択';
+        }
+      } else if (mode === 'shuffle') {
+        if (selectedCell === null) {
+          status.textContent = 'シャッフルモード: 1つ目のパネルを選択';
+        } else {
+          status.textContent = 'シャッフルモード: 2つ目のパネルを選択（色が入れ替わります）';
+        }
+      }
+    }
+
+    function resetGame() {
+      gridSize = 0;
+      cells = [];
+      mode = 'idle';
+      currentColorIndex = 0;
+      coloringStep = 0;
+      selectedCell = null;
+
+      document.getElementById('sizeSelection').classList.remove('hidden');
+      document.getElementById('gameControls').classList.add('hidden');
+      document.getElementById('grid').innerHTML = '';
+
+      updateStatus();
+    }
+
+    // 初期状態の設定
+    updateStatus();
+  </script>
+</body>
+</html>
