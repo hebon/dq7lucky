@@ -98,6 +98,8 @@
       justify-content: center;
       font-size: clamp(12px, 2.5vw, 14px);
       color: rgba(0, 0, 0, 0.3);
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .cell:hover {
@@ -105,10 +107,17 @@
       transform: scale(1.05);
     }
 
+    .cell:focus {
+      outline: none;
+    }
+
     .cell.selected {
-      border-color: #000;
-      border-width: 3px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      border-color: #FF4444;
+      border-width: 4px;
+      box-shadow: 0 0 20px rgba(255, 68, 68, 0.8), inset 0 0 10px rgba(255, 68, 68, 0.3);
+      transform: scale(1.08);
+      position: relative;
+      z-index: 10;
     }
 
     .hidden {
@@ -304,7 +313,9 @@
       if (selectedCell === null) {
         // 1つ目のパネルを選択
         selectedCell = index;
-        document.querySelector(`[data-index="${index}"]`).classList.add('selected');
+        const cell = document.querySelector(`[data-index="${index}"]`);
+        cell.classList.add('selected');
+        cell.blur(); // フォーカスを解除
         updateStatus();
       } else {
         // 2つ目のパネルを選択して色を交換
@@ -321,7 +332,12 @@
         updateCellDisplay(document.querySelector(`[data-index="${cell2}"]`), cell2);
 
         // 選択状態をクリア
-        document.querySelector(`[data-index="${cell1}"]`).classList.remove('selected');
+        const cell1Element = document.querySelector(`[data-index="${cell1}"]`);
+        const cell2Element = document.querySelector(`[data-index="${cell2}"]`);
+        cell1Element.classList.remove('selected');
+        cell2Element.classList.remove('selected');
+        cell1Element.blur(); // フォーカスを解除
+        cell2Element.blur(); // フォーカスを解除
         selectedCell = null;
         updateStatus();
       }
