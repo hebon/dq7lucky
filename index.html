@@ -18,7 +18,7 @@
       align-items: center;
       padding: 10px;
       background-color: #f5f5f5;
-      min-height: 100vh;
+      /*min-height: 100vh;*/
     }
 
     h1 {
@@ -87,6 +87,11 @@
       grid-template-rows: repeat(4, minmax(55px, 80px));
     }
 
+    .grid.size-6x4 {
+      grid-template-columns: repeat(6, minmax(50px, 70px));
+      grid-template-rows: repeat(4, minmax(50px, 70px));
+    }
+
     .cell {
       background-color: white;
       border: 2px solid #999;
@@ -141,6 +146,11 @@
         grid-template-rows: repeat(4, calc((100vw - 40px) / 5));
       }
 
+      .grid.size-6x4 {
+        grid-template-columns: repeat(6, calc((100vw - 40px) / 6));
+        grid-template-rows: repeat(4, calc((100vw - 40px) / 6));
+      }
+
       .controls {
         flex-wrap: wrap;
         justify-content: center;
@@ -171,9 +181,10 @@
   <h1>ラッキーパネル</h1>
 
   <div id="sizeSelection" class="controls">
-    <button onclick="startGame(12)">4x3で開始</button>
-    <button onclick="startGame(16)">4x4で開始</button>
-    <button onclick="startGame(20)">5x4で開始</button>
+    <button onclick="startGame(12)">4x3</button>
+    <button onclick="startGame(16)">4x4</button>
+    <button onclick="startGame(20)">5x4</button>
+    <button onclick="startGame(24)">6x4</button>
   </div>
 
   <div id="gameControls" class="controls hidden">
@@ -186,17 +197,19 @@
   <div id="grid" class="grid"></div>
 
   <script>
-    // 9色のパステルカラー
+    // 11色のパステルカラー（1-9はパステル、10-11はダーク系）
     const PAIR_COLORS = [
-      '#FFB3BA', // パステルレッド
-      '#87CEEB', // パステルブルー（濃いめ）
-      '#BAFFC9', // パステルグリーン
-      '#FFD6E8', // パステルピンク
-      '#B19CD9', // パステルパープル（濃いめ）
-      '#FFDFBA', // パステルオレンジ
-      '#7FDBDB', // パステルシアン（暗めで緑寄り）
-      '#E8FFBA', // パステルライム
-      '#DDA0DD', // パステルラベンダー（プラム系）
+      '#FFB3BA', // 1: パステルレッド
+      '#87CEEB', // 2: パステルブルー（濃いめ）
+      '#BAFFC9', // 3: パステルグリーン
+      '#FFD6E8', // 4: パステルピンク
+      '#B19CD9', // 5: パステルパープル（濃いめ）
+      '#FFDFBA', // 6: パステルオレンジ
+      '#7FDBDB', // 7: パステルシアン（暗めで緑寄り）
+      '#E8FFBA', // 8: パステルライム
+      '#DDA0DD', // 9: パステルラベンダー（プラム系）
+      '#8B4513', // 10: ダークブラウン（サドルブラウン）
+      '#2F4F4F', // 11: ダークスレートグレー
     ];
 
     const LUCKY_COLOR = '#FFD700'; // 濃い黄色（ゴールド）
@@ -227,8 +240,10 @@
         grid.className = 'grid size-4x3';
       } else if (size === 16) {
         grid.className = 'grid size-4x4';
-      } else {
+      } else if (size === 20) {
         grid.className = 'grid size-5x4';
+      } else if (size === 24) {
+        grid.className = 'grid size-6x4';
       }
       grid.innerHTML = '';
 
@@ -264,8 +279,10 @@
         pairCount = 5; // 4x3: 5ペア
       } else if (gridSize === 16) {
         pairCount = 7; // 4x4: 7ペア
-      } else {
+      } else if (gridSize === 20) {
         pairCount = 9; // 5x4: 9ペア
+      } else if (gridSize === 24) {
+        pairCount = 11; // 6x4: 11ペア
       }
       const totalPairs = pairCount * 2;
 
@@ -380,8 +397,10 @@
           pairCount = 5; // 4x3: 5ペア
         } else if (gridSize === 16) {
           pairCount = 7; // 4x4: 7ペア
-        } else {
+        } else if (gridSize === 20) {
           pairCount = 9; // 5x4: 9ペア
+        } else if (gridSize === 24) {
+          pairCount = 11; // 6x4: 11ペア
         }
         const coloredCount = cells.filter(c => c.color !== INITIAL_COLOR).length;
         const totalPairs = pairCount * 2;
